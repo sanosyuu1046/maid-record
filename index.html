@@ -210,8 +210,27 @@ footer {
     <div id="storeChart"></div>
   </div>
   <div class="card">
-    <h3>メイドさん別チェキ枚数</h3>
+    <h3>店舗別利用金額</h3>
+    <div id="storeMoneyChart"></div>
+  </div>
+  <div class="card">
+    <h3>メイドさん別チェキランキング</h3>
     <div id="maidChart"></div>
+  </div>
+  <div class="card">
+    <h3>年間まとめ</h3>
+    <label>集計する年</label>
+    <select id="yearSelect" onchange="renderStats()"></select>
+    <div class="stats" style="margin-top:10px">
+      <div class="stat"><small>年間利用金額</small><strong id="yearMoney">¥0</strong></div>
+      <div class="stat"><small>年間来店回数</small><strong id="yearVisits">0回</strong></div>
+      <div class="stat"><small>年間チェキ枚数</small><strong id="yearChekis">0枚</strong></div>
+      <div class="stat"><small>平均利用金額</small><strong id="yearAverage">¥0</strong></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>月別来店回数ランキング</h3>
+    <div id="visitChart"></div>
   </div>
 </section>
 
@@ -347,7 +366,12 @@ function tab(id,btn){
 function render(){
  renderHome();renderCalendar();renderStats();renderSettings();
 }
-function total(r){return Math.round((r.orders||[]).reduce((s,x)=>s+x.price*x.qty,0)+(r.amuse||[]).reduce((s,x)=>s+x.price*x.qty,0));}
+function total(r){
+  const menuTotal=(r.orders||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.qty)||0),0);
+  const amuseTotal=(r.amuse||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.qty)||0),0);
+  const chekiTotal=(r.chekis||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.count)||0),0);
+  return Math.round(menuTotal+amuseTotal+chekiTotal);
+}
 function finalTotal(r){return Math.round(total(r)*(1-(r.discount||0)/100));}
 function renderHome(){
  let sum=data.records.reduce((s,r)=>s+finalTotal(r),0);
@@ -461,17 +485,75 @@ function saveRecord(){
 }
 function closeEditor(){document.getElementById("editor").classList.add("hidden");}
 function renderStats(){
- let months={};
- data.records.forEach(r=>months[r.date.slice(0,7)]=(months[r.date.slice(0,7)]||0)+finalTotal(r));
- let max=Math.max(1,...Object.values(months));
- document.getElementById("moneyChart").innerHTML=Object.entries(months).sort().slice(-12).map(([m,v])=>`<div>${m}　${yen(v)}</div><div class="bar"><div style="width:${v/max*100}%"></div></div>`).join("")||"データがありません";
- let stores={},maids={};
- data.records.forEach(r=>{
-  stores[r.store]=(stores[r.store]||0)+1;
-  (r.chekis||[]).forEach(c=>maids[c.name]=(maids[c.name]||0)+c.count);
- });
- document.getElementById("storeChart").innerHTML=Object.entries(stores).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="item">${esc(k)}：${v}回</div>`).join("")||"データがありません";
- document.getElementById("maidChart").innerHTML=Object.entries(maids).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="item row"><span>${esc(k)}</span><b>${v}枚</b></div>`).join("")||"データがありません";
+  const records=data.records||[];
+  const months={};
+  records.forEach(r=>{
+    const key=(r.date||"").slice(0,7);
+    if(key)months[key]=(months[key]||0)+finalTotal(r);
+  });
+  const monthEntries=Object.entries(months).sort((a,b)=>a[0].localeCompare(b[0])).slice(-12);
+  const maxMonth=Math.max(1,...monthEntries.map(x=>x[1]));
+  document.getElementById("moneyChart").innerHTML=monthEntries.map(([m,v])=>
+    `<div>${esc(m)}　${yen(v)}</div><div class="bar"><div style="width:${Math.max(0,v/maxMonth*100)}%"></div></div>`
+  ).join("")||"データがありません";
+
+  const stores={},storeMoney={},maids={};
+  records.forEach(r=>{
+    const store=r.store||"店舗未設定";
+    stores[store]=(stores[store]||0)+1;
+    storeMoney[store]=(storeMoney[store]||0)+finalTotal(r);
+    (r.chekis||[]).forEach(c=>{
+      const name=c.name||"名前未設定";
+      if(!maids[name])maids[name]={count:0,money:0};
+      const count=Number(c.count)||0;
+      const price=Number(c.price)||0;
+      maids[name].count+=count;
+      maids[name].money+=count*price;
+    });
+  });
+
+  document.getElementById("storeChart").innerHTML=Object.entries(stores)
+    .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))
+    .map(([k,v],i)=>`<div class="item row"><span>${i+1}位　${esc(k)}</span><b>${v}回</b></div>`)
+    .join("")||"データがありません";
+
+  const maxStoreMoney=Math.max(1,...Object.values(storeMoney));
+  document.getElementById("storeMoneyChart").innerHTML=Object.entries(storeMoney)
+    .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))
+    .map(([k,v])=>`<div>${esc(k)}　${yen(v)}</div><div class="bar"><div style="width:${Math.max(0,v/maxStoreMoney*100)}%"></div></div>`)
+    .join("")||"データがありません";
+
+  document.getElementById("maidChart").innerHTML=Object.entries(maids)
+    .sort((a,b)=>b[1].count-a[1].count||a[0].localeCompare(b[0]))
+    .map(([k,v],i)=>`<div class="item"><div class="row"><b>${i+1}位　${esc(k)}</b><b>${v.count}枚</b></div><small>チェキ料金合計：${yen(v.money)}</small></div>`)
+    .join("")||"データがありません";
+
+  const years=[...new Set(records.map(r=>(r.date||"").slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort();
+  const thisYear=String(new Date().getFullYear());
+  if(!years.includes(thisYear))years.push(thisYear);
+  const yearSelect=document.getElementById("yearSelect");
+  const previous=yearSelect.value;
+  yearSelect.innerHTML=years.sort().map(y=>`<option value="${esc(y)}">${esc(y)}年</option>`).join("");
+  yearSelect.value=years.includes(previous)?previous:thisYear;
+
+  const selectedYear=yearSelect.value;
+  const yearly=records.filter(r=>(r.date||"").startsWith(selectedYear+"-"));
+  const yearMoney=yearly.reduce((s,r)=>s+finalTotal(r),0);
+  const yearChekis=yearly.reduce((s,r)=>s+(r.chekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0),0);
+  document.getElementById("yearMoney").textContent=yen(yearMoney);
+  document.getElementById("yearVisits").textContent=yearly.length+"回";
+  document.getElementById("yearChekis").textContent=yearChekis+"枚";
+  document.getElementById("yearAverage").textContent=yen(yearly.length?yearMoney/yearly.length:0);
+
+  const monthVisits={};
+  records.forEach(r=>{
+    const key=(r.date||"").slice(0,7);
+    if(key)monthVisits[key]=(monthVisits[key]||0)+1;
+  });
+  document.getElementById("visitChart").innerHTML=Object.entries(monthVisits)
+    .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))
+    .map(([k,v],i)=>`<div class="item row"><span>${i+1}位　${esc(k)}</span><b>${v}回</b></div>`)
+    .join("")||"データがありません";
 }
 function renderSettings(){
  document.getElementById("stores").innerHTML=data.stores.map((x,i)=>`<div class="item row">${esc(x)}<button class="secondary" onclick="delSetting('stores',${i})">削除</button></div>`).join("");
