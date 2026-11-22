@@ -1,0 +1,477 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Maid Record</title>
+<style>
+:root {
+  --pink:#ec78a8;
+  --light:#fff0f6;
+  --dark:#75445b;
+  --white:#fff;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0;
+  background:#fff6fa;
+  color:#634353;
+  font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+}
+header {
+  background:linear-gradient(135deg,#f6a3c5,#e96e9f);
+  color:white;
+  padding:25px 20px;
+  border-radius:0 0 25px 25px;
+}
+header h1 { margin:0; font-size:25px; }
+header p { margin:7px 0 0; font-size:12px; }
+nav {
+  display:flex;
+  overflow-x:auto;
+  background:white;
+  padding:10px;
+  gap:7px;
+  position:sticky;
+  top:0;
+  z-index:5;
+}
+nav button {
+  border:0;
+  background:#fff0f6;
+  color:#a65379;
+  padding:10px 14px;
+  border-radius:20px;
+  white-space:nowrap;
+}
+nav button.active { background:#e96e9f;color:white; }
+main { padding:16px; max-width:700px; margin:auto; }
+h2 { font-size:19px; }
+h3 { font-size:15px; }
+.card {
+  background:white;
+  border-radius:18px;
+  padding:16px;
+  margin-bottom:14px;
+  box-shadow:0 3px 12px #e8b8cc30;
+}
+.stats {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.stat {
+  background:#fff0f6;
+  padding:15px;
+  border-radius:15px;
+}
+.stat small { color:#a77b90; }
+.stat strong {
+  display:block;
+  font-size:23px;
+  margin-top:5px;
+  color:#d85c91;
+}
+button.primary {
+  background:var(--pink);
+  color:white;
+  border:0;
+  border-radius:12px;
+  padding:12px 18px;
+  font-weight:bold;
+}
+button.secondary {
+  background:#fff0f6;
+  color:#a65379;
+  border:0;
+  border-radius:10px;
+  padding:10px;
+}
+input,select {
+  width:100%;
+  padding:12px;
+  border:1px solid #f0c7d8;
+  border-radius:10px;
+  background:white;
+  color:#634353;
+  margin:5px 0 12px;
+  font-size:15px;
+}
+label { font-size:13px; font-weight:bold; }
+.calendar {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:5px;
+  text-align:center;
+}
+.day {
+  background:#fff5f9;
+  border-radius:10px;
+  min-height:48px;
+  padding:7px 2px;
+  border:1px solid transparent;
+  color:#75445b;
+}
+.day.has { background:#fbd8e7; }
+.day.today { border-color:#e96e9f; }
+.day span { display:block;font-size:10px;color:#d85c91; }
+.row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+}
+.item {
+  background:#fff5f9;
+  padding:10px;
+  border-radius:10px;
+  margin:7px 0;
+}
+.hidden { display:none; }
+.total {
+  font-size:25px;
+  font-weight:bold;
+  color:#d94f8c;
+}
+.bar {
+  height:17px;
+  background:#f5c8dc;
+  border-radius:20px;
+  margin:7px 0;
+  overflow:hidden;
+}
+.bar div {
+  height:100%;
+  background:#e96e9f;
+  border-radius:20px;
+}
+.month { text-align:center;font-weight:bold; }
+footer {
+  text-align:center;
+  padding:25px;
+  color:#bd91a6;
+  font-size:11px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>♡ My Maid Record ♡</h1>
+  <p>あっとほぉーむカフェ 来店記録</p>
+</header>
+
+<nav>
+  <button class="active" onclick="tab('home',this)">HOME</button>
+  <button onclick="tab('calendar',this)">カレンダー</button>
+  <button onclick="tab('stats',this)">統計・グラフ</button>
+  <button onclick="tab('settings',this)">設定</button>
+</nav>
+
+<main>
+<section id="home">
+  <h2>♡ My Record</h2>
+  <div class="stats">
+    <div class="stat"><small>累計利用金額</small><strong id="total">¥0</strong></div>
+    <div class="stat"><small>来店回数</small><strong id="visits">0回</strong></div>
+    <div class="stat"><small>チェキ総枚数</small><strong id="chekis">0枚</strong></div>
+    <div class="stat"><small>平均利用金額</small><strong id="average">¥0</strong></div>
+  </div>
+  <div class="card">
+    <h3>♡ 最近の来店記録</h3>
+    <div id="recent">まだ記録がありません</div>
+  </div>
+  <button class="primary" onclick="tab('calendar',document.querySelectorAll('nav button')[1])">＋ 来店を記録する</button>
+</section>
+
+<section id="calendar" class="hidden">
+  <h2>♡ 来店カレンダー</h2>
+  <div class="card">
+    <div class="row">
+      <button class="secondary" onclick="changeMonth(-1)">‹</button>
+      <div class="month" id="month"></div>
+      <button class="secondary" onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="calendar" id="cal"></div>
+  </div>
+  <p style="font-size:12px">日付をタップすると来店記録を登録できるよ ♡</p>
+  <div id="recordList"></div>
+</section>
+
+<section id="stats" class="hidden">
+  <h2>♡ 利用統計</h2>
+  <div class="card">
+    <h3>月別利用金額</h3>
+    <div id="moneyChart"></div>
+  </div>
+  <div class="card">
+    <h3>店舗別来店回数</h3>
+    <div id="storeChart"></div>
+  </div>
+  <div class="card">
+    <h3>メイドさん別チェキ枚数</h3>
+    <div id="maidChart"></div>
+  </div>
+</section>
+
+<section id="settings" class="hidden">
+  <h2>♡ 設定・メニュー管理</h2>
+  <div class="card">
+    <h3>店舗登録</h3>
+    <div id="stores"></div>
+    <input id="newStore" placeholder="店舗名">
+    <button class="primary" onclick="addStore()">店舗を追加</button>
+  </div>
+  <div class="card">
+    <h3>メニュー登録</h3>
+    <div id="menus"></div>
+    <input id="menuName" placeholder="メニュー名">
+    <input id="menuPrice" type="number" placeholder="料金">
+    <button class="primary" onclick="addMenu()">メニューを追加</button>
+  </div>
+  <div class="card">
+    <h3>ランク設定</h3>
+    <p style="font-size:12px">ランクは来店記録に保存されるよ。料金への反映率は初期設定では全て100%です。</p>
+    <div id="ranks"></div>
+    <input id="rankName" placeholder="ランク名">
+    <button class="primary" onclick="addRank()">ランクを追加</button>
+  </div>
+  <div class="card">
+    <h3>データバックアップ</h3>
+    <button class="primary" onclick="backup()">データを書き出す</button>
+    <input type="file" id="restoreFile" accept=".json" onchange="restore(event)">
+    <button class="secondary" onclick="document.getElementById('restoreFile').click()">データを読み込む</button>
+  </div>
+</section>
+
+<div id="editor" class="card hidden">
+  <h2>♡ 来店記録</h2>
+  <label>日付</label>
+  <input type="date" id="date">
+  <label>利用店舗</label>
+  <select id="store"></select>
+  <label>ランク</label>
+  <select id="rank"></select>
+  <label>割引</label>
+  <select id="discount">
+    <option value="0">割引なし</option>
+    <option value="5">5% OFF</option>
+    <option value="10">10% OFF</option>
+    <option value="15">15% OFF</option>
+    <option value="20">20% OFF</option>
+    <option value="custom">自由入力</option>
+  </select>
+  <div id="customDiscountBox" class="hidden">
+    <label>割引率（%）</label>
+    <input id="customDiscount" type="number" min="0" max="100" value="0">
+  </div>
+  <h3>注文したメニュー</h3>
+  <div id="orderList"></div>
+  <label>登録済みメニュー</label>
+  <select id="menuSelect"></select>
+  <button class="secondary" onclick="addOrder()">＋ メニューを追加</button>
+  <h3>自由入力メニュー</h3>
+  <div class="row">
+    <input id="freeName" placeholder="商品名">
+    <input id="freePrice" type="number" placeholder="料金">
+  </div>
+  <button class="secondary" onclick="addFreeOrder()">＋ 自由入力を追加</button>
+  <h3>アミューズメント</h3>
+  <div id="amuseList"></div>
+  <div class="row">
+    <input id="amuseName" placeholder="内容">
+    <input id="amusePrice" type="number" placeholder="料金">
+  </div>
+  <button class="secondary" onclick="addAmuse()">＋ 追加</button>
+  <h3>チェキ記録</h3>
+  <div id="chekiList"></div>
+  <div class="row">
+    <input id="maidName" placeholder="メイドさんの名前">
+    <input id="maidCount" type="number" min="1" value="1" placeholder="枚数">
+  </div>
+  <button class="secondary" onclick="addCheki()">＋ チェキを追加</button>
+  <label>メモ</label>
+  <input id="memo" placeholder="今日の思い出など">
+  <div class="card">
+    <small>小計</small>
+    <div id="subtotal">¥0</div>
+    <small>割引後の合計</small>
+    <div class="total" id="grandTotal">¥0</div>
+  </div>
+  <button class="primary" onclick="saveRecord()">記録を保存する ♡</button>
+  <button class="secondary" onclick="closeEditor()">閉じる</button>
+</div>
+</main>
+
+<footer>♡ My Maid Record ♡</footer>
+
+<script>
+const KEY="maidRecordData";
+let data=JSON.parse(localStorage.getItem(KEY)||"null") || {
+ records:[],
+ stores:["秋葉原本店","大阪本店","名古屋本店"],
+ menus:[],
+ ranks:["通常","ブロンズ","シルバー","ゴールド","プラチナ"]
+};
+let current=new Date();
+let orders=[],amuse=[],chekis=[],editingDate="";
+
+function persist(){
+ localStorage.setItem(KEY,JSON.stringify(data));
+}
+function yen(n){return "¥"+Number(n||0).toLocaleString("ja-JP");}
+function tab(id,btn){
+ document.querySelectorAll("main>section").forEach(x=>x.classList.add("hidden"));
+ document.getElementById("editor").classList.add("hidden");
+ document.getElementById(id).classList.remove("hidden");
+ document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+ if(btn)btn.classList.add("active");
+ render();
+}
+function render(){
+ renderHome();renderCalendar();renderStats();renderSettings();
+}
+function total(r){return Math.round((r.orders||[]).reduce((s,x)=>s+x.price*x.qty,0)+(r.amuse||[]).reduce((s,x)=>s+x.price*x.qty,0));}
+function finalTotal(r){return Math.round(total(r)*(1-(r.discount||0)/100));}
+function renderHome(){
+ let sum=data.records.reduce((s,r)=>s+finalTotal(r),0);
+ let count=data.records.reduce((s,r)=>s+(r.chekis||[]).reduce((a,c)=>a+c.count,0),0);
+ document.getElementById("total").textContent=yen(sum);
+ document.getElementById("visits").textContent=data.records.length+"回";
+ document.getElementById("chekis").textContent=count+"枚";
+ document.getElementById("average").textContent=yen(data.records.length?sum/data.records.length:0);
+ document.getElementById("recent").innerHTML=data.records.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5).map(r=>`<div class="item"><b>${r.date}</b><br>${r.store}・${yen(finalTotal(r))}</div>`).join("")||"まだ記録がありません";
+}
+function renderCalendar(){
+ let y=current.getFullYear(),m=current.getMonth();
+ document.getElementById("month").textContent=y+"年 "+(m+1)+"月";
+ let first=new Date(y,m,1).getDay(),last=new Date(y,m+1,0).getDate();
+ let html=["日","月","火","水","木","金","土"].map(x=>`<div>${x}</div>`).join("");
+ for(let i=0;i<first;i++)html+="<div></div>";
+ for(let d=1;d<=last;d++){
+  let date=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  let exists=data.records.some(r=>r.date===date);
+  html+=`<button class="day ${exists?"has":""}" onclick="openEditor('${date}')">${d}${exists?"<span>♡ 来店</span>":""}</button>`;
+ }
+ document.getElementById("cal").innerHTML=html;
+ document.getElementById("recordList").innerHTML=data.records.filter(r=>r.date.startsWith(`${y}-${String(m+1).padStart(2,"0")}`)).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="item row"><span>${r.date}<br>${r.store}</span><b>${yen(finalTotal(r))}</b><button class="secondary" onclick="openEditor('${r.date}')">編集</button></div>`).join("");
+}
+function changeMonth(n){current.setMonth(current.getMonth()+n);renderCalendar();}
+function openEditor(date){
+ editingDate=date;
+ let old=data.records.find(r=>r.date===date);
+ orders=old?structuredClone(old.orders):[];
+ amuse=old?structuredClone(old.amuse):[];
+ chekis=old?structuredClone(old.chekis):[];
+ document.getElementById("date").value=date;
+ document.getElementById("store").innerHTML=data.stores.map(s=>`<option>${esc(s)}</option>`).join("");
+ document.getElementById("rank").innerHTML=data.ranks.map(s=>`<option>${esc(s)}</option>`).join("");
+ document.getElementById("menuSelect").innerHTML=data.menus.map((x,i)=>`<option value="${i}">${esc(x.name)} (${yen(x.price)})</option>`).join("");
+ document.getElementById("store").value=old?.store||data.stores[0];
+ document.getElementById("rank").value=old?.rank||data.ranks[0];
+ document.getElementById("discount").value=old?.discount||0;
+ document.getElementById("customDiscountBox").classList.add("hidden");
+ if(old?.discount>20){document.getElementById("discount").value="custom";document.getElementById("customDiscount").value=old.discount;document.getElementById("customDiscountBox").classList.remove("hidden");}
+ document.getElementById("memo").value=old?.memo||"";
+ document.getElementById("editor").classList.remove("hidden");
+ document.getElementById("editor").scrollIntoView({behavior:"smooth"});
+ renderEditor();
+}
+document.getElementById("discount").addEventListener("change",e=>{
+ document.getElementById("customDiscountBox").classList.toggle("hidden",e.target.value!=="custom");
+ calc();
+});
+function addOrder(){
+ let i=Number(document.getElementById("menuSelect").value);
+ if(data.menus[i])orders.push({...data.menus[i],qty:1});
+ renderEditor();
+}
+function addFreeOrder(){
+ let name=document.getElementById("freeName").value.trim(),price=Number(document.getElementById("freePrice").value);
+ if(!name||price<0||!Number.isFinite(price))return alert("商品名と料金を入力してね");
+ orders.push({name,price,qty:1});
+ document.getElementById("freeName").value="";
+ document.getElementById("freePrice").value="";
+ renderEditor();
+}
+function addAmuse(){
+ let name=document.getElementById("amuseName").value.trim(),price=Number(document.getElementById("amusePrice").value);
+ if(!name||price<0||!Number.isFinite(price))return alert("内容と料金を入力してね");
+ amuse.push({name,price,qty:1});
+ document.getElementById("amuseName").value="";
+ document.getElementById("amusePrice").value="";
+ renderEditor();
+}
+function addCheki(){
+ let name=document.getElementById("maidName").value.trim(),count=Number(document.getElementById("maidCount").value);
+ if(!name||count<1)return alert("名前と枚数を入力してね");
+ let old=chekis.find(x=>x.name===name);
+ if(old)old.count+=count;else chekis.push({name,count});
+ document.getElementById("maidName").value="";
+ renderEditor();
+}
+function removeItem(type,i){
+ ({orders,amuse,chekis}[type]).splice(i,1);renderEditor();
+}
+function renderEditor(){
+ document.getElementById("orderList").innerHTML=orders.map((x,i)=>`<div class="item row"><span>${esc(x.name)}<br>${yen(x.price)} × ${x.qty}</span><button class="secondary" onclick="removeItem('orders',${i})">削除</button></div>`).join("")||"まだ注文がありません";
+ document.getElementById("amuseList").innerHTML=amuse.map((x,i)=>`<div class="item row"><span>${esc(x.name)}<br>${yen(x.price)}</span><button class="secondary" onclick="removeItem('amuse',${i})">削除</button></div>`).join("")||"なし";
+ document.getElementById("chekiList").innerHTML=chekis.map((x,i)=>`<div class="item row"><span>${esc(x.name)}：${x.count}枚</span><button class="secondary" onclick="removeItem('chekis',${i})">削除</button></div>`).join("")||"まだチェキがありません";
+ calc();
+}
+function calc(){
+ let sub=orders.reduce((s,x)=>s+x.price*x.qty,0)+amuse.reduce((s,x)=>s+x.price*x.qty,0);
+ let d=document.getElementById("discount").value;
+ let rate=d==="custom"?Number(document.getElementById("customDiscount").value):Number(d);
+ document.getElementById("subtotal").textContent=yen(sub);
+ document.getElementById("grandTotal").textContent=yen(sub*(1-rate/100));
+}
+document.getElementById("customDiscount").addEventListener("input",calc);
+function saveRecord(){
+ let d=document.getElementById("discount").value;
+ let rate=d==="custom"?Number(document.getElementById("customDiscount").value):Number(d);
+ if(rate<0||rate>100)return alert("割引率は0〜100で入力してね");
+ let r={date:document.getElementById("date").value,store:document.getElementById("store").value,rank:document.getElementById("rank").value,discount:rate,orders,amuse,chekis,memo:document.getElementById("memo").value};
+ let i=data.records.findIndex(x=>x.date===r.date);
+ if(i>=0)data.records[i]=r;else data.records.push(r);
+ persist();closeEditor();render();alert("来店記録を保存したよ ♡");
+}
+function closeEditor(){document.getElementById("editor").classList.add("hidden");}
+function renderStats(){
+ let months={};
+ data.records.forEach(r=>months[r.date.slice(0,7)]=(months[r.date.slice(0,7)]||0)+finalTotal(r));
+ let max=Math.max(1,...Object.values(months));
+ document.getElementById("moneyChart").innerHTML=Object.entries(months).sort().slice(-12).map(([m,v])=>`<div>${m}　${yen(v)}</div><div class="bar"><div style="width:${v/max*100}%"></div></div>`).join("")||"データがありません";
+ let stores={},maids={};
+ data.records.forEach(r=>{
+  stores[r.store]=(stores[r.store]||0)+1;
+  (r.chekis||[]).forEach(c=>maids[c.name]=(maids[c.name]||0)+c.count);
+ });
+ document.getElementById("storeChart").innerHTML=Object.entries(stores).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="item">${esc(k)}：${v}回</div>`).join("")||"データがありません";
+ document.getElementById("maidChart").innerHTML=Object.entries(maids).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="item row"><span>${esc(k)}</span><b>${v}枚</b></div>`).join("")||"データがありません";
+}
+function renderSettings(){
+ document.getElementById("stores").innerHTML=data.stores.map((x,i)=>`<div class="item row">${esc(x)}<button class="secondary" onclick="delSetting('stores',${i})">削除</button></div>`).join("");
+ document.getElementById("menus").innerHTML=data.menus.map((x,i)=>`<div class="item row"><span>${esc(x.name)} ${yen(x.price)}</span><button class="secondary" onclick="delSetting('menus',${i})">削除</button></div>`).join("")||"メニューはまだありません";
+ document.getElementById("ranks").innerHTML=data.ranks.map((x,i)=>`<div class="item row">${esc(x)}<button class="secondary" onclick="delSetting('ranks',${i})">削除</button></div>`).join("");
+}
+function addStore(){let x=document.getElementById("newStore").value.trim();if(!x)return;data.stores.push(x);document.getElementById("newStore").value="";persist();render();}
+function addMenu(){let name=document.getElementById("menuName").value.trim(),price=Number(document.getElementById("menuPrice").value);if(!name||!Number.isFinite(price)||price<0)return alert("メニュー名と料金を入力してね");data.menus.push({name,price});document.getElementById("menuName").value="";document.getElementById("menuPrice").value="";persist();render();}
+function addRank(){let x=document.getElementById("rankName").value.trim();if(!x)return;data.ranks.push(x);document.getElementById("rankName").value="";persist();render();}
+function delSetting(type,i){if(!confirm("削除していい？"))return;data[type].splice(i,1);persist();render();}
+function backup(){
+ let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+ let a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="maid-record-backup.json";a.click();URL.revokeObjectURL(a.href);
+}
+function restore(e){
+ let f=e.target.files[0];if(!f)return;
+ let reader=new FileReader();
+ reader.onload=()=>{try{let x=JSON.parse(reader.result);if(!Array.isArray(x.records)||!Array.isArray(x.menus)||!Array.isArray(x.stores)||!Array.isArray(x.ranks))throw 0;data=x;persist();render();alert("読み込み完了！");}catch(err){alert("ファイルを読み込めませんでした");}};
+ reader.readAsText(f);
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+render();
+</script>
+</body>
+</html>
