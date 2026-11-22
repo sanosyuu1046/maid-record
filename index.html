@@ -237,7 +237,21 @@ footer {
     <input id="rankName" placeholder="ランク名">
     <button class="primary" onclick="addRank()">ランクを追加</button>
   </div>
-  <div class="card">
+<div class="card">
+  <h3>♡ メイドさん・チェキ料金設定</h3>
+  <div id="maidRanks"></div>
+  <div class="row">
+    <input id="maidRankName" placeholder="メイドさんの名前">
+    <select id="maidRankType">
+      <option value="870">メイド（870円）</option>
+      <option value="1170">プレミアムメイド（1,170円）</option>
+      <option value="1420">スーパープレミアムメイド（1,420円）</option>
+      <option value="1620">レジェンドメイド（1,620円）</option>
+    </select>
+  </div>
+  <button class="primary" onclick="addMaidRank()">メイドさんを登録</button>
+</div>
+<div class="card">
     <h3>データバックアップ</h3>
     <button class="primary" onclick="backup()">データを書き出す</button>
     <input type="file" id="restoreFile" accept=".json" onchange="restore(event)">
@@ -313,6 +327,7 @@ let data=JSON.parse(localStorage.getItem(KEY)||"null") || {
  stores:["秋葉原本店","大阪本店","名古屋本店"],
  menus:[],
  ranks:["通常","ブロンズ","シルバー","ゴールド","プラチナ"]
+maidRanks:[],
 };
 let current=new Date();
 let orders=[],amuse=[],chekis=[],editingDate="";
@@ -404,12 +419,19 @@ function addAmuse(){
  renderEditor();
 }
 function addCheki(){
- let name=document.getElementById("maidName").value.trim(),count=Number(document.getElementById("maidCount").value);
- if(!name||count<1)return alert("名前と枚数を入力してね");
- let old=chekis.find(x=>x.name===name);
- if(old)old.count+=count;else chekis.push({name,count});
- document.getElementById("maidName").value="";
- renderEditor();
+  let name=document.getElementById("maidName").value.trim();
+  let count=Number(document.getElementById("maidCount").value);
+  if(!name||count<1)return alert("名前と枚数を入力してね");
+
+  let maid=data.maidRanks.find(x=>x.name===name);
+  if(!maid)return alert("先にメイドさんを登録してね");
+
+  let old=chekis.find(x=>x.name===name);
+  if(old)old.count+=count;
+  else chekis.push({name,count,price:maid.price});
+
+  document.getElementById("maidName").value="";
+  renderEditor();
 }
 function removeItem(type,i){
  ({orders,amuse,chekis}[type]).splice(i,1);renderEditor();
@@ -421,7 +443,7 @@ function renderEditor(){
  calc();
 }
 function calc(){
- let sub=orders.reduce((s,x)=>s+x.price*x.qty,0)+amuse.reduce((s,x)=>s+x.price*x.qty,0);
+ let sub=orders.reduce((s,x)=>s+x.price*x.qty,0)+amuse.reduce((s,x)=>s+x.price*x.qty,0)+chekis.reduce((s,x)=>s+x.price*x.count,0);
  let d=document.getElementById("discount").value;
  let rate=d==="custom"?Number(document.getElementById("customDiscount").value):Number(d);
  document.getElementById("subtotal").textContent=yen(sub);
@@ -459,6 +481,16 @@ function renderSettings(){
 function addStore(){let x=document.getElementById("newStore").value.trim();if(!x)return;data.stores.push(x);document.getElementById("newStore").value="";persist();render();}
 function addMenu(){let name=document.getElementById("menuName").value.trim(),price=Number(document.getElementById("menuPrice").value);if(!name||!Number.isFinite(price)||price<0)return alert("メニュー名と料金を入力してね");data.menus.push({name,price});document.getElementById("menuName").value="";document.getElementById("menuPrice").value="";persist();render();}
 function addRank(){let x=document.getElementById("rankName").value.trim();if(!x)return;data.ranks.push(x);document.getElementById("rankName").value="";persist();render();}
+function addMaidRank(){
+  let name=document.getElementById("maidRankName").value.trim();
+  let price=Number(document.getElementById("maidRankType").value);
+  if(!name)return alert("メイドさんの名前を入力してね");
+  if(data.maidRanks.some(x=>x.name===name))return alert("登録済みの名前だよ");
+  data.maidRanks.push({name,price});
+  document.getElementById("maidRankName").value="";
+  persist();
+  renderSettings();
+}
 function delSetting(type,i){if(!confirm("削除していい？"))return;data[type].splice(i,1);persist();render();}
 function backup(){
  let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
