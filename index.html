@@ -175,8 +175,7 @@ footer {
   <div class="stats">
     <div class="stat"><small>累計利用金額</small><strong id="total">¥0</strong></div>
     <div class="stat"><small>来店回数</small><strong id="visits">0回</strong></div>
-    <div class="stat"><small>チェキ総枚数</small><strong id="chekis">0枚</strong></div>
-    <div class="stat"><small>平均利用金額</small><strong id="average">¥0</strong></div>
+    <div class="stat"><small>コレクションチェキ総枚数</small><strong id="collectionChekisTotal">0枚</strong></div>
   </div>
   <div class="card">
     <h3>♡ 最近の来店記録</h3>
@@ -216,6 +215,10 @@ footer {
   <div class="card">
     <h3>メイドさん別チェキランキング</h3>
     <div id="maidChart"></div>
+  </div>
+  <div class="card">
+    <h3>メイドさん別コレクションチェキランキング</h3>
+    <div id="maidCollectionChart"></div>
   </div>
   <div class="card">
     <h3>年間まとめ</h3>
@@ -294,15 +297,14 @@ footer {
   <div class="item row"><span>入場料</span><b id="rankFee">¥0</b></div>
   <label>割引</label>
   <select id="discount">
-    <option value="0">割引なし</option>
-    <option value="5">5% OFF</option>
-    <option value="10">10% OFF</option>
-    <option value="15">15% OFF</option>
-    <option value="20">20% OFF</option>
-    <option value="custom">自由入力</option>
+    <option value="none">割引なし</option>
+    <option value="youth">青年（19歳～22歳） 250円引き</option>
+    <option value="senior">シニア（60歳～） 250円引き</option>
+    <option value="child">中人（13歳～18歳） 450円引き</option>
+    <option value="legacy">以前の記録の割引（割合）</option>
   </select>
   <div id="customDiscountBox" class="hidden">
-    <label>割引率（%）</label>
+    <label>以前の割引率（%）</label>
     <input id="customDiscount" type="number" min="0" max="100" value="0">
   </div>
   <h3>注文したメニュー</h3>
@@ -387,14 +389,16 @@ function total(r){
   const admissionFee=Number(r.rankFee)||0;
   return Math.round(menuTotal+amuseTotal+chekiTotal+collectionChekiTotal+admissionFee);
 }
-function finalTotal(r){return Math.round(total(r)*(1-(r.discount||0)/100));}
+function finalTotal(r){
+  if(r.discountAmount!=null)return Math.max(0,Math.round(total(r)-Number(r.discountAmount||0)));
+  return Math.max(0,Math.round(total(r)*(1-(Number(r.discount)||0)/100)));
+}
 function renderHome(){
  let sum=data.records.reduce((s,r)=>s+finalTotal(r),0);
- let count=data.records.reduce((s,r)=>s+(r.chekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0)+(r.collectionChekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0),0);
+ let collectionCount=data.records.reduce((s,r)=>s+(r.collectionChekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0),0);
  document.getElementById("total").textContent=yen(sum);
  document.getElementById("visits").textContent=data.records.length+"回";
- document.getElementById("chekis").textContent=count+"枚";
- document.getElementById("average").textContent=yen(data.records.length?sum/data.records.length:0);
+ document.getElementById("collectionChekisTotal").textContent=collectionCount+"枚";
  document.getElementById("recent").innerHTML=data.records.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5).map(r=>`<div class="item"><b>${r.date}</b><br>${r.store}・${yen(finalTotal(r))}</div>`).join("")||"まだ記録がありません";
 }
 function renderCalendar(){
@@ -425,9 +429,17 @@ function openEditor(date){
  document.getElementById("menuSelect").innerHTML=data.menus.map((x,i)=>`<option value="${i}">${esc(x.name)} (${yen(x.price)})</option>`).join("");
  document.getElementById("store").value=old?.store||data.stores[0];
  document.getElementById("rank").value=FIXED_RANKS.includes(old?.rank)?old.rank:FIXED_RANKS[0];
- document.getElementById("discount").value=old?.discount||0;
+ const discountSelect=document.getElementById("discount");
  document.getElementById("customDiscountBox").classList.add("hidden");
- if(old?.discount>20){document.getElementById("discount").value="custom";document.getElementById("customDiscount").value=old.discount;document.getElementById("customDiscountBox").classList.remove("hidden");}
+ if(old?.discountAmount!=null){
+   discountSelect.value=old.discountType||"none";
+ }else if(Number(old?.discount)>0){
+   discountSelect.value="legacy";
+   document.getElementById("customDiscount").value=old.discount;
+   document.getElementById("customDiscountBox").classList.remove("hidden");
+ }else{
+   discountSelect.value="none";
+ }
  document.getElementById("memo").value=old?.memo||"";
  updateRankFee();
  document.getElementById("editor").classList.remove("hidden");
@@ -440,7 +452,7 @@ function updateRankFee(){
   document.getElementById("rankFee").textContent=yen(RANK_FEES[rank]||0);
 }
 document.getElementById("discount").addEventListener("change",e=>{
- document.getElementById("customDiscountBox").classList.toggle("hidden",e.target.value!=="custom");
+ document.getElementById("customDiscountBox").classList.toggle("hidden",e.target.value!=="legacy");
  calc();
 });
 function addOrder(){
@@ -496,17 +508,19 @@ function renderEditor(){
 function calc(){
  let sub=orders.reduce((s,x)=>s+x.price*x.qty,0)+amuse.reduce((s,x)=>s+x.price*x.qty,0)+chekis.reduce((s,x)=>s+x.price*x.count,0)+collectionChekis.reduce((s,x)=>s+x.price*x.count,0)+Number(RANK_FEES[document.getElementById("rank").value]||0);
  let d=document.getElementById("discount").value;
- let rate=d==="custom"?Number(document.getElementById("customDiscount").value):Number(d);
+ let amount={youth:250,senior:250,child:450}[d]||0;
+ let rate=d==="legacy"?Number(document.getElementById("customDiscount").value):0;
  document.getElementById("subtotal").textContent=yen(sub);
- document.getElementById("grandTotal").textContent=yen(sub*(1-rate/100));
+ document.getElementById("grandTotal").textContent=yen(Math.max(0,sub-amount-(d==="legacy"?sub*rate/100:0)));
 }
 document.getElementById("customDiscount").addEventListener("input",calc);
 function saveRecord(){
  let d=document.getElementById("discount").value;
- let rate=d==="custom"?Number(document.getElementById("customDiscount").value):Number(d);
+ let rate=d==="legacy"?Number(document.getElementById("customDiscount").value):0;
  if(rate<0||rate>100)return alert("割引率は0〜100で入力してね");
+ let discountAmount={youth:250,senior:250,child:450}[d]||0;
  let selectedRank=document.getElementById("rank").value;
- let r={date:document.getElementById("date").value,store:document.getElementById("store").value,rank:selectedRank,rankFee:Number(RANK_FEES[selectedRank]||0),discount:rate,orders,amuse,chekis,collectionChekis,memo:document.getElementById("memo").value};
+ let r={date:document.getElementById("date").value,store:document.getElementById("store").value,rank:selectedRank,rankFee:Number(RANK_FEES[selectedRank]||0),discount:rate,discountType:d,discountAmount:d==="legacy"?null:discountAmount,orders,amuse,chekis,collectionChekis,memo:document.getElementById("memo").value};
  let i=data.records.findIndex(x=>x.date===r.date);
  if(i>=0)data.records[i]=r;else data.records.push(r);
  persist();closeEditor();render();alert("来店記録を保存したよ ♡");
@@ -562,6 +576,12 @@ function renderStats(){
   document.getElementById("maidChart").innerHTML=Object.entries(maids)
     .sort((a,b)=>b[1].count-a[1].count||a[0].localeCompare(b[0]))
     .map(([k,v],i)=>`<div class="item"><div class="row"><b>${i+1}位　${esc(k)}</b><b>${v.count+(v.collectionCount||0)}枚</b></div><small>通常チェキ：${v.count}枚・${yen(v.money)}<br>コレクションチェキ：${v.collectionCount||0}枚・${yen(v.collectionMoney||0)}</small></div>`)
+    .join("")||"データがありません";
+
+  document.getElementById("maidCollectionChart").innerHTML=Object.entries(maids)
+    .filter(([k,v])=>(v.collectionCount||0)>0)
+    .sort((a,b)=>(b[1].collectionCount||0)-(a[1].collectionCount||0)||a[0].localeCompare(b[0]))
+    .map(([k,v],i)=>`<div class="item"><div class="row"><b>${i+1}位　${esc(k)}</b><b>${v.collectionCount}枚</b></div><small>コレクションチェキ料金合計：${yen(v.collectionMoney||0)}</small></div>`)
     .join("")||"データがありません";
 
   const years=[...new Set(records.map(r=>(r.date||"").slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort();
