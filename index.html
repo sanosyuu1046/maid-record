@@ -250,11 +250,9 @@ footer {
     <button class="primary" onclick="addMenu()">メニューを追加</button>
   </div>
   <div class="card">
-    <h3>ランク設定</h3>
-    <p style="font-size:12px">ランクは来店記録に保存されるよ。料金への反映率は初期設定では全て100%です。</p>
+    <h3>ランク・入場料設定</h3>
+    <p style="font-size:12px">ランクは固定です。来店記録で選ぶと入場料が自動で加算されます。</p>
     <div id="ranks"></div>
-    <input id="rankName" placeholder="ランク名">
-    <button class="primary" onclick="addRank()">ランクを追加</button>
   </div>
 <div class="card">
   <h3>♡ メイドさん・チェキ料金設定</h3>
@@ -286,6 +284,7 @@ footer {
   <select id="store"></select>
   <label>ランク</label>
   <select id="rank"></select>
+  <div class="item row"><span>入場料</span><b id="rankFee">¥0</b></div>
   <label>割引</label>
   <select id="discount">
     <option value="0">割引なし</option>
@@ -341,6 +340,8 @@ footer {
 
 <script>
 const KEY="maidRecordData";
+const RANK_FEES={"ブロンズ":850,"シルバー":710,"ゴールド":610,"クリスタル":510,"プラチナ":410,"ブラック":310,"スーパーブラック":130};
+const FIXED_RANKS=Object.keys(RANK_FEES);
 let data=JSON.parse(localStorage.getItem(KEY)||"null") || {
  records:[],
  stores:["秋葉原本店","大阪本店","名古屋本店"],
@@ -370,7 +371,8 @@ function total(r){
   const menuTotal=(r.orders||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.qty)||0),0);
   const amuseTotal=(r.amuse||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.qty)||0),0);
   const chekiTotal=(r.chekis||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.count)||0),0);
-  return Math.round(menuTotal+amuseTotal+chekiTotal);
+  const admissionFee=Number(r.rankFee)||0;
+  return Math.round(menuTotal+amuseTotal+chekiTotal+admissionFee);
 }
 function finalTotal(r){return Math.round(total(r)*(1-(r.discount||0)/100));}
 function renderHome(){
@@ -416,6 +418,11 @@ function openEditor(date){
  document.getElementById("editor").classList.remove("hidden");
  document.getElementById("editor").scrollIntoView({behavior:"smooth"});
  renderEditor();
+}
+document.getElementById("rank").addEventListener("change",()=>{updateRankFee();calc();});
+function updateRankFee(){
+  const rank=document.getElementById("rank").value;
+  document.getElementById("rankFee").textContent=yen(RANK_FEES[rank]||0);
 }
 document.getElementById("discount").addEventListener("change",e=>{
  document.getElementById("customDiscountBox").classList.toggle("hidden",e.target.value!=="custom");
@@ -562,7 +569,6 @@ function renderSettings(){
 }
 function addStore(){let x=document.getElementById("newStore").value.trim();if(!x)return;data.stores.push(x);document.getElementById("newStore").value="";persist();render();}
 function addMenu(){let name=document.getElementById("menuName").value.trim(),price=Number(document.getElementById("menuPrice").value);if(!name||!Number.isFinite(price)||price<0)return alert("メニュー名と料金を入力してね");data.menus.push({name,price});document.getElementById("menuName").value="";document.getElementById("menuPrice").value="";persist();render();}
-function addRank(){let x=document.getElementById("rankName").value.trim();if(!x)return;data.ranks.push(x);document.getElementById("rankName").value="";persist();render();}
 function addMaidRank(){
   let name=document.getElementById("maidRankName").value.trim();
   let price=Number(document.getElementById("maidRankType").value);
@@ -573,7 +579,7 @@ function addMaidRank(){
   persist();
   renderSettings();
 }
-function delSetting(type,i){if(!confirm("削除していい？"))return;data[type].splice(i,1);persist();render();}
+function delSetting(type,i){if(type==="ranks")return;if(!confirm("削除していい？"))return;data[type].splice(i,1);persist();render();}
 function backup(){
  let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
  let a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="maid-record-backup.json";a.click();URL.revokeObjectURL(a.href);
