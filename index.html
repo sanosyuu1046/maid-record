@@ -255,7 +255,7 @@ footer {
     <div id="ranks"></div>
   </div>
 <div class="card">
-  <h3>♡ メイドさん・チェキ料金設定</h3>
+  <h3>♡ メイドさん・通常／コレクションチェキ料金設定</h3>
   <div id="maidRanks"></div>
   <div class="row">
     <input id="maidRankName" placeholder="メイドさんの名前">
@@ -266,6 +266,13 @@ footer {
       <option value="1620">レジェンドメイド（1,620円）</option>
     </select>
   </div>
+  <label>コレクションチェキ料金</label>
+  <select id="maidCollectionRankType">
+    <option value="1170">メイド（1,170円）</option>
+    <option value="1470">プレミアムメイド（1,470円）</option>
+    <option value="1720">スーパープレミアムメイド（1,720円）</option>
+    <option value="1920">レジェンドメイド（1,920円）</option>
+  </select>
   <button class="primary" onclick="addMaidRank()">メイドさんを登録</button>
 </div>
 <div class="card">
@@ -309,14 +316,14 @@ footer {
     <input id="freePrice" type="number" placeholder="料金">
   </div>
   <button class="secondary" onclick="addFreeOrder()">＋ 自由入力を追加</button>
-  <h3>アミューズメント</h3>
-  <div id="amuseList"></div>
+  <h3>コレクションチェキ記録</h3>
+  <div id="collectionChekiList"></div>
   <div class="row">
-    <input id="amuseName" placeholder="内容">
-    <input id="amusePrice" type="number" placeholder="料金">
+    <input id="collectionMaidName" placeholder="メイドさんの名前">
+    <input id="collectionMaidCount" type="number" min="1" value="1" placeholder="枚数">
   </div>
-  <button class="secondary" onclick="addAmuse()">＋ 追加</button>
-  <h3>チェキ記録</h3>
+  <button class="secondary" onclick="addCollectionCheki()">＋ コレクションチェキを追加</button>
+  <h3>通常チェキ記録</h3>
   <div id="chekiList"></div>
   <div class="row">
     <input id="maidName" placeholder="メイドさんの名前">
@@ -350,9 +357,12 @@ let data=JSON.parse(localStorage.getItem(KEY)||"null") || {
 maidRanks:[],
 };
 data.ranks=FIXED_RANKS.slice();
+if(!Array.isArray(data.maidRanks))data.maidRanks=[];
+const COLLECTION_PRICE_BY_CHEKI={870:1170,1170:1470,1420:1720,1620:1920};
+data.maidRanks.forEach(m=>{if(m.collectionPrice==null)m.collectionPrice=COLLECTION_PRICE_BY_CHEKI[Number(m.price)]||1170;});
 persist();
 let current=new Date();
-let orders=[],amuse=[],chekis=[],editingDate="";
+let orders=[],amuse=[],chekis=[],collectionChekis=[],editingDate="";
 
 function persist(){
  localStorage.setItem(KEY,JSON.stringify(data));
@@ -373,13 +383,14 @@ function total(r){
   const menuTotal=(r.orders||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.qty)||0),0);
   const amuseTotal=(r.amuse||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.qty)||0),0);
   const chekiTotal=(r.chekis||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.count)||0),0);
+  const collectionChekiTotal=(r.collectionChekis||[]).reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.count)||0),0);
   const admissionFee=Number(r.rankFee)||0;
-  return Math.round(menuTotal+amuseTotal+chekiTotal+admissionFee);
+  return Math.round(menuTotal+amuseTotal+chekiTotal+collectionChekiTotal+admissionFee);
 }
 function finalTotal(r){return Math.round(total(r)*(1-(r.discount||0)/100));}
 function renderHome(){
  let sum=data.records.reduce((s,r)=>s+finalTotal(r),0);
- let count=data.records.reduce((s,r)=>s+(r.chekis||[]).reduce((a,c)=>a+c.count,0),0);
+ let count=data.records.reduce((s,r)=>s+(r.chekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0)+(r.collectionChekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0),0);
  document.getElementById("total").textContent=yen(sum);
  document.getElementById("visits").textContent=data.records.length+"回";
  document.getElementById("chekis").textContent=count+"枚";
@@ -407,6 +418,7 @@ function openEditor(date){
  orders=old?structuredClone(old.orders):[];
  amuse=old?structuredClone(old.amuse):[];
  chekis=old?structuredClone(old.chekis):[];
+ collectionChekis=old?structuredClone(old.collectionChekis||[]):[];
  document.getElementById("date").value=date;
  document.getElementById("store").innerHTML=data.stores.map(s=>`<option>${esc(s)}</option>`).join("");
  document.getElementById("rank").innerHTML=FIXED_RANKS.map(s=>`<option>${esc(s)}</option>`).join("");
@@ -417,6 +429,7 @@ function openEditor(date){
  document.getElementById("customDiscountBox").classList.add("hidden");
  if(old?.discount>20){document.getElementById("discount").value="custom";document.getElementById("customDiscount").value=old.discount;document.getElementById("customDiscountBox").classList.remove("hidden");}
  document.getElementById("memo").value=old?.memo||"";
+ updateRankFee();
  document.getElementById("editor").classList.remove("hidden");
  document.getElementById("editor").scrollIntoView({behavior:"smooth"});
  renderEditor();
@@ -443,13 +456,18 @@ function addFreeOrder(){
  document.getElementById("freePrice").value="";
  renderEditor();
 }
-function addAmuse(){
- let name=document.getElementById("amuseName").value.trim(),price=Number(document.getElementById("amusePrice").value);
- if(!name||price<0||!Number.isFinite(price))return alert("内容と料金を入力してね");
- amuse.push({name,price,qty:1});
- document.getElementById("amuseName").value="";
- document.getElementById("amusePrice").value="";
- renderEditor();
+function addCollectionCheki(){
+  let name=document.getElementById("collectionMaidName").value.trim();
+  let count=Number(document.getElementById("collectionMaidCount").value);
+  if(!name||count<1)return alert("メイドさんの名前と枚数を入力してね");
+  let maid=data.maidRanks.find(x=>x.name===name);
+  if(!maid)return alert("先に設定画面でメイドさんとコレクションチェキ料金を登録してね");
+  let old=collectionChekis.find(x=>x.name===name);
+  if(old)old.count+=count;
+  else collectionChekis.push({name,count,price:Number(maid.collectionPrice)||0});
+  document.getElementById("collectionMaidName").value="";
+  document.getElementById("collectionMaidCount").value="1";
+  renderEditor();
 }
 function addCheki(){
   let name=document.getElementById("maidName").value.trim();
@@ -467,16 +485,16 @@ function addCheki(){
   renderEditor();
 }
 function removeItem(type,i){
- ({orders,amuse,chekis}[type]).splice(i,1);renderEditor();
+ ({orders,amuse,chekis,collectionChekis}[type]).splice(i,1);renderEditor();
 }
 function renderEditor(){
  document.getElementById("orderList").innerHTML=orders.map((x,i)=>`<div class="item row"><span>${esc(x.name)}<br>${yen(x.price)} × ${x.qty}</span><button class="secondary" onclick="removeItem('orders',${i})">削除</button></div>`).join("")||"まだ注文がありません";
- document.getElementById("amuseList").innerHTML=amuse.map((x,i)=>`<div class="item row"><span>${esc(x.name)}<br>${yen(x.price)}</span><button class="secondary" onclick="removeItem('amuse',${i})">削除</button></div>`).join("")||"なし";
+ document.getElementById("collectionChekiList").innerHTML=collectionChekis.map((x,i)=>`<div class="item row"><span>${esc(x.name)}：${x.count}枚<br>${yen(x.price)} × ${x.count}</span><button class="secondary" onclick="removeItem('collectionChekis',${i})">削除</button></div>`).join("")||"まだコレクションチェキがありません";
  document.getElementById("chekiList").innerHTML=chekis.map((x,i)=>`<div class="item row"><span>${esc(x.name)}：${x.count}枚</span><button class="secondary" onclick="removeItem('chekis',${i})">削除</button></div>`).join("")||"まだチェキがありません";
  calc();
 }
 function calc(){
- let sub=orders.reduce((s,x)=>s+x.price*x.qty,0)+amuse.reduce((s,x)=>s+x.price*x.qty,0)+chekis.reduce((s,x)=>s+x.price*x.count,0);
+ let sub=orders.reduce((s,x)=>s+x.price*x.qty,0)+amuse.reduce((s,x)=>s+x.price*x.qty,0)+chekis.reduce((s,x)=>s+x.price*x.count,0)+collectionChekis.reduce((s,x)=>s+x.price*x.count,0)+Number(RANK_FEES[document.getElementById("rank").value]||0);
  let d=document.getElementById("discount").value;
  let rate=d==="custom"?Number(document.getElementById("customDiscount").value):Number(d);
  document.getElementById("subtotal").textContent=yen(sub);
@@ -487,7 +505,8 @@ function saveRecord(){
  let d=document.getElementById("discount").value;
  let rate=d==="custom"?Number(document.getElementById("customDiscount").value):Number(d);
  if(rate<0||rate>100)return alert("割引率は0〜100で入力してね");
- let r={date:document.getElementById("date").value,store:document.getElementById("store").value,rank:document.getElementById("rank").value,discount:rate,orders,amuse,chekis,memo:document.getElementById("memo").value};
+ let selectedRank=document.getElementById("rank").value;
+ let r={date:document.getElementById("date").value,store:document.getElementById("store").value,rank:selectedRank,rankFee:Number(RANK_FEES[selectedRank]||0),discount:rate,orders,amuse,chekis,collectionChekis,memo:document.getElementById("memo").value};
  let i=data.records.findIndex(x=>x.date===r.date);
  if(i>=0)data.records[i]=r;else data.records.push(r);
  persist();closeEditor();render();alert("来店記録を保存したよ ♡");
@@ -519,6 +538,14 @@ function renderStats(){
       maids[name].count+=count;
       maids[name].money+=count*price;
     });
+    (r.collectionChekis||[]).forEach(c=>{
+      const name=c.name||"名前未設定";
+      if(!maids[name])maids[name]={count:0,money:0,collectionCount:0,collectionMoney:0};
+      const count=Number(c.count)||0;
+      const price=Number(c.price)||0;
+      maids[name].collectionCount=(maids[name].collectionCount||0)+count;
+      maids[name].collectionMoney=(maids[name].collectionMoney||0)+count*price;
+    });
   });
 
   document.getElementById("storeChart").innerHTML=Object.entries(stores)
@@ -534,7 +561,7 @@ function renderStats(){
 
   document.getElementById("maidChart").innerHTML=Object.entries(maids)
     .sort((a,b)=>b[1].count-a[1].count||a[0].localeCompare(b[0]))
-    .map(([k,v],i)=>`<div class="item"><div class="row"><b>${i+1}位　${esc(k)}</b><b>${v.count}枚</b></div><small>チェキ料金合計：${yen(v.money)}</small></div>`)
+    .map(([k,v],i)=>`<div class="item"><div class="row"><b>${i+1}位　${esc(k)}</b><b>${v.count+(v.collectionCount||0)}枚</b></div><small>通常チェキ：${v.count}枚・${yen(v.money)}<br>コレクションチェキ：${v.collectionCount||0}枚・${yen(v.collectionMoney||0)}</small></div>`)
     .join("")||"データがありません";
 
   const years=[...new Set(records.map(r=>(r.date||"").slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort();
@@ -548,7 +575,7 @@ function renderStats(){
   const selectedYear=yearSelect.value;
   const yearly=records.filter(r=>(r.date||"").startsWith(selectedYear+"-"));
   const yearMoney=yearly.reduce((s,r)=>s+finalTotal(r),0);
-  const yearChekis=yearly.reduce((s,r)=>s+(r.chekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0),0);
+  const yearChekis=yearly.reduce((s,r)=>s+(r.chekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0)+(r.collectionChekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0),0);
   document.getElementById("yearMoney").textContent=yen(yearMoney);
   document.getElementById("yearVisits").textContent=yearly.length+"回";
   document.getElementById("yearChekis").textContent=yearChekis+"枚";
@@ -568,19 +595,22 @@ function renderSettings(){
  document.getElementById("stores").innerHTML=data.stores.map((x,i)=>`<div class="item row">${esc(x)}<button class="secondary" onclick="delSetting('stores',${i})">削除</button></div>`).join("");
  document.getElementById("menus").innerHTML=data.menus.map((x,i)=>`<div class="item row"><span>${esc(x.name)} ${yen(x.price)}</span><button class="secondary" onclick="delSetting('menus',${i})">削除</button></div>`).join("")||"メニューはまだありません";
  document.getElementById("ranks").innerHTML=FIXED_RANKS.map(x=>`<div class="item row"><span>${esc(x)}</span><b>${yen(RANK_FEES[x])}</b></div>`).join("");
+ document.getElementById("maidRanks").innerHTML=data.maidRanks.map((x,i)=>`<div class="item row"><span>${esc(x.name)}<br><small>通常：${yen(x.price)} ／ コレクション：${yen(x.collectionPrice)}</small></span><button class="secondary" onclick="delMaidRank(${i})">削除</button></div>`).join("")||"メイドさんはまだ登録されていません";
 }
 function addStore(){let x=document.getElementById("newStore").value.trim();if(!x)return;data.stores.push(x);document.getElementById("newStore").value="";persist();render();}
 function addMenu(){let name=document.getElementById("menuName").value.trim(),price=Number(document.getElementById("menuPrice").value);if(!name||!Number.isFinite(price)||price<0)return alert("メニュー名と料金を入力してね");data.menus.push({name,price});document.getElementById("menuName").value="";document.getElementById("menuPrice").value="";persist();render();}
 function addMaidRank(){
   let name=document.getElementById("maidRankName").value.trim();
   let price=Number(document.getElementById("maidRankType").value);
+  let collectionPrice=Number(document.getElementById("maidCollectionRankType").value);
   if(!name)return alert("メイドさんの名前を入力してね");
   if(data.maidRanks.some(x=>x.name===name))return alert("登録済みの名前だよ");
-  data.maidRanks.push({name,price});
+  data.maidRanks.push({name,price,collectionPrice});
   document.getElementById("maidRankName").value="";
   persist();
   renderSettings();
 }
+function delMaidRank(i){if(!confirm("このメイドさんの料金設定を削除していい？"))return;data.maidRanks.splice(i,1);persist();renderSettings();}
 function delSetting(type,i){if(type==="ranks")return;if(!confirm("削除していい？"))return;data[type].splice(i,1);persist();render();}
 function backup(){
  let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
@@ -589,7 +619,7 @@ function backup(){
 function restore(e){
  let f=e.target.files[0];if(!f)return;
  let reader=new FileReader();
- reader.onload=()=>{try{let x=JSON.parse(reader.result);if(!Array.isArray(x.records)||!Array.isArray(x.menus)||!Array.isArray(x.stores)||!Array.isArray(x.ranks))throw 0;data=x;persist();render();alert("読み込み完了！");}catch(err){alert("ファイルを読み込めませんでした");}};
+ reader.onload=()=>{try{let x=JSON.parse(reader.result);if(!Array.isArray(x.records)||!Array.isArray(x.menus)||!Array.isArray(x.stores)||!Array.isArray(x.ranks))throw 0;data=x;if(!Array.isArray(data.maidRanks))data.maidRanks=[];data.maidRanks.forEach(m=>{if(m.collectionPrice==null)m.collectionPrice=COLLECTION_PRICE_BY_CHEKI[Number(m.price)]||1170;});data.ranks=FIXED_RANKS.slice();persist();render();alert("読み込み完了！");}catch(err){alert("ファイルを読み込めませんでした");}};
  reader.readAsText(f);
 }
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
