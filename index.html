@@ -342,6 +342,7 @@ footer {
     <div class="total" id="grandTotal">¥0</div>
   </div>
   <button class="primary" onclick="saveRecord()">記録を保存する ♡</button>
+  <button class="secondary hidden" id="deleteRecordButton" onclick="deleteRecord()" style="background:#fff0f0;color:#c44">この来店記録を削除</button>
   <button class="secondary" onclick="closeEditor()">閉じる</button>
 </div>
 </main>
@@ -433,6 +434,7 @@ function openEditor(date){
  chekis=old?structuredClone(old.chekis):[];
  collectionChekis=old?structuredClone(old.collectionChekis||[]):[];
  document.getElementById("date").value=date;
+ document.getElementById("deleteRecordButton").classList.toggle("hidden",!old);
  document.getElementById("store").innerHTML=data.stores.map(s=>`<option>${esc(s)}</option>`).join("");
  document.getElementById("rank").innerHTML=FIXED_RANKS.map(s=>`<option>${esc(s)}</option>`).join("");
  document.getElementById("menuSelect").innerHTML=data.menus.map((x,i)=>`<option value="${i}">${esc(x.name)} (${yen(x.price)})</option>`).join("");
@@ -533,6 +535,16 @@ function saveRecord(){
  let i=data.records.findIndex(x=>x.date===r.date);
  if(i>=0)data.records[i]=r;else data.records.push(r);
  persist();closeEditor();render();alert("来店記録を保存したよ ♡");
+}
+function deleteRecord(){
+ const old=data.records.find(r=>r.date===editingDate);
+ if(!old)return;
+ if(!confirm(`${editingDate} の来店記録を削除してもいい？\nこの操作は取り消せません。`))return;
+ data.records=data.records.filter(r=>r.date!==editingDate);
+ persist();
+ closeEditor();
+ render();
+ alert("来店記録を削除したよ");
 }
 function closeEditor(){document.getElementById("editor").classList.add("hidden");}
 function renderStats(){
