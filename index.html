@@ -175,6 +175,7 @@ footer {
   <div class="stats">
     <div class="stat"><small>累計利用金額</small><strong id="total">¥0</strong></div>
     <div class="stat"><small>来店回数</small><strong id="visits">0回</strong></div>
+    <div class="stat"><small>チェキ総数</small><strong id="chekisTotal">0枚</strong></div>
     <div class="stat"><small>コレクションチェキ総枚数</small><strong id="collectionChekisTotal">0枚</strong></div>
   </div>
   <div class="card">
@@ -263,18 +264,18 @@ footer {
   <div class="row">
     <input id="maidRankName" placeholder="メイドさんの名前">
     <select id="maidRankType">
-      <option value="870">メイド（870円）</option>
-      <option value="1170">プレミアムメイド（1,170円）</option>
-      <option value="1420">スーパープレミアムメイド（1,420円）</option>
-      <option value="1620">レジェンドメイド（1,620円）</option>
+      <option value="900">メイド（900円）</option>
+      <option value="1200">プレミアムメイド（1,200円）</option>
+      <option value="1450">スーパープレミアムメイド（1,450円）</option>
+      <option value="1650">レジェンドメイド（1,650円）</option>
     </select>
   </div>
   <label>コレクションチェキ料金</label>
   <select id="maidCollectionRankType">
-    <option value="1170">メイド（1,170円）</option>
-    <option value="1470">プレミアムメイド（1,470円）</option>
-    <option value="1720">スーパープレミアムメイド（1,720円）</option>
-    <option value="1920">レジェンドメイド（1,920円）</option>
+    <option value="1200">メイド（1,200円）</option>
+    <option value="1500">プレミアムメイド（1,500円）</option>
+    <option value="1750">スーパープレミアムメイド（1,750円）</option>
+    <option value="1950">レジェンドメイド（1,950円）</option>
   </select>
   <button class="primary" onclick="addMaidRank()">メイドさんを登録</button>
 </div>
@@ -360,8 +361,14 @@ maidRanks:[],
 };
 data.ranks=FIXED_RANKS.slice();
 if(!Array.isArray(data.maidRanks))data.maidRanks=[];
-const COLLECTION_PRICE_BY_CHEKI={870:1170,1170:1470,1420:1720,1620:1920};
-data.maidRanks.forEach(m=>{if(m.collectionPrice==null)m.collectionPrice=COLLECTION_PRICE_BY_CHEKI[Number(m.price)]||1170;});
+const OLD_TO_NEW_CHEKI_PRICE={870:900,1170:1200,1420:1450,1620:1650};
+const OLD_TO_NEW_COLLECTION_PRICE={1170:1200,1470:1500,1720:1750,1920:1950};
+const COLLECTION_PRICE_BY_CHEKI={900:1200,1200:1500,1450:1750,1650:1950};
+data.maidRanks.forEach(m=>{
+  if(OLD_TO_NEW_CHEKI_PRICE[Number(m.price)])m.price=OLD_TO_NEW_CHEKI_PRICE[Number(m.price)];
+  if(m.collectionPrice==null)m.collectionPrice=COLLECTION_PRICE_BY_CHEKI[Number(m.price)]||1200;
+  else if(OLD_TO_NEW_COLLECTION_PRICE[Number(m.collectionPrice)])m.collectionPrice=OLD_TO_NEW_COLLECTION_PRICE[Number(m.collectionPrice)];
+});
 persist();
 let current=new Date();
 let orders=[],amuse=[],chekis=[],collectionChekis=[],editingDate="";
@@ -395,9 +402,11 @@ function finalTotal(r){
 }
 function renderHome(){
  let sum=data.records.reduce((s,r)=>s+finalTotal(r),0);
+ let chekiCount=data.records.reduce((s,r)=>s+(r.chekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0),0);
  let collectionCount=data.records.reduce((s,r)=>s+(r.collectionChekis||[]).reduce((a,c)=>a+(Number(c.count)||0),0),0);
  document.getElementById("total").textContent=yen(sum);
  document.getElementById("visits").textContent=data.records.length+"回";
+ document.getElementById("chekisTotal").textContent=chekiCount+"枚";
  document.getElementById("collectionChekisTotal").textContent=collectionCount+"枚";
  document.getElementById("recent").innerHTML=data.records.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5).map(r=>`<div class="item"><b>${r.date}</b><br>${r.store}・${yen(finalTotal(r))}</div>`).join("")||"まだ記録がありません";
 }
