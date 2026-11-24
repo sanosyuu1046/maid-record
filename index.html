@@ -349,6 +349,8 @@ let data=JSON.parse(localStorage.getItem(KEY)||"null") || {
  ranks:["通常","ブロンズ","シルバー","ゴールド","プラチナ"],
 maidRanks:[],
 };
+data.ranks=FIXED_RANKS.slice();
+persist();
 let current=new Date();
 let orders=[],amuse=[],chekis=[],editingDate="";
 
@@ -407,10 +409,10 @@ function openEditor(date){
  chekis=old?structuredClone(old.chekis):[];
  document.getElementById("date").value=date;
  document.getElementById("store").innerHTML=data.stores.map(s=>`<option>${esc(s)}</option>`).join("");
- document.getElementById("rank").innerHTML=data.ranks.map(s=>`<option>${esc(s)}</option>`).join("");
+ document.getElementById("rank").innerHTML=FIXED_RANKS.map(s=>`<option>${esc(s)}</option>`).join("");
  document.getElementById("menuSelect").innerHTML=data.menus.map((x,i)=>`<option value="${i}">${esc(x.name)} (${yen(x.price)})</option>`).join("");
  document.getElementById("store").value=old?.store||data.stores[0];
- document.getElementById("rank").value=old?.rank||data.ranks[0];
+ document.getElementById("rank").value=FIXED_RANKS.includes(old?.rank)?old.rank:FIXED_RANKS[0];
  document.getElementById("discount").value=old?.discount||0;
  document.getElementById("customDiscountBox").classList.add("hidden");
  if(old?.discount>20){document.getElementById("discount").value="custom";document.getElementById("customDiscount").value=old.discount;document.getElementById("customDiscountBox").classList.remove("hidden");}
@@ -565,7 +567,7 @@ function renderStats(){
 function renderSettings(){
  document.getElementById("stores").innerHTML=data.stores.map((x,i)=>`<div class="item row">${esc(x)}<button class="secondary" onclick="delSetting('stores',${i})">削除</button></div>`).join("");
  document.getElementById("menus").innerHTML=data.menus.map((x,i)=>`<div class="item row"><span>${esc(x.name)} ${yen(x.price)}</span><button class="secondary" onclick="delSetting('menus',${i})">削除</button></div>`).join("")||"メニューはまだありません";
- document.getElementById("ranks").innerHTML=data.ranks.map((x,i)=>`<div class="item row">${esc(x)}<button class="secondary" onclick="delSetting('ranks',${i})">削除</button></div>`).join("");
+ document.getElementById("ranks").innerHTML=FIXED_RANKS.map(x=>`<div class="item row"><span>${esc(x)}</span><b>${yen(RANK_FEES[x])}</b></div>`).join("");
 }
 function addStore(){let x=document.getElementById("newStore").value.trim();if(!x)return;data.stores.push(x);document.getElementById("newStore").value="";persist();render();}
 function addMenu(){let name=document.getElementById("menuName").value.trim(),price=Number(document.getElementById("menuPrice").value);if(!name||!Number.isFinite(price)||price<0)return alert("メニュー名と料金を入力してね");data.menus.push({name,price});document.getElementById("menuName").value="";document.getElementById("menuPrice").value="";persist();render();}
