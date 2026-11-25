@@ -372,7 +372,11 @@ data.maidRanks.forEach(m=>{
 });
 persist();
 let current=new Date();
-let orders=[],amuse=[],chekis=[],collectionChekis=[],editingDate="";
+let orders=[],amuse=[],chekis=[],collectionChekis=[],editingDate="",editingId=null;
+// Give each visit its own stable ID so multiple visits can share one date.
+data.records.forEach((r,i)=>{if(!r.id)r.id=`visit-${i}-${String(r.date||"")}`;});
+persist();
+function newRecordId(){return "visit-"+Date.now()+"-"+Math.random().toString(36).slice(2,8);}
 
 function persist(){
  localStorage.setItem(KEY,JSON.stringify(data));
@@ -419,16 +423,22 @@ function renderCalendar(){
  for(let i=0;i<first;i++)html+="<div></div>";
  for(let d=1;d<=last;d++){
   let date=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-  let exists=data.records.some(r=>r.date===date);
-  html+=`<button class="day ${exists?"has":""}" onclick="openEditor('${date}')">${d}${exists?"<span>♡ 来店</span>":""}</button>`;
+  let count=data.records.filter(r=>r.date===date).length;
+  html+=`<button class="day ${count?"has":""}" onclick="showDayRecords('${date}')">${d}${count?`<span>♡ ${count}件</span>`:""}</button>`;
  }
  document.getElementById("cal").innerHTML=html;
- document.getElementById("recordList").innerHTML=data.records.filter(r=>r.date.startsWith(`${y}-${String(m+1).padStart(2,"0")}`)).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="item row"><span>${r.date}<br>${r.store}</span><b>${yen(finalTotal(r))}</b><button class="secondary" onclick="openEditor('${r.date}')">編集</button></div>`).join("");
+ document.getElementById("recordList").innerHTML=data.records.filter(r=>r.date.startsWith(`${y}-${String(m+1).padStart(2,"0")}`)).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="item row"><span>${r.date}<br>${esc(r.store)}</span><b>${yen(finalTotal(r))}</b><button class="secondary" onclick="openEditor('${r.date}','${r.id}')">編集</button></div>`).join("");
+}
+function showDayRecords(date){
+ const same=data.records.filter(r=>r.date===date);
+ const list=document.getElementById("recordList");
+ list.innerHTML=`<div class="card"><h3>♡ ${date} の来店記録（${same.length}件）</h3>${same.map((r,i)=>`<div class="item row"><span>${i+1}回目・${esc(r.store)}<br>${yen(finalTotal(r))}</span><button class="secondary" onclick="openEditor('${date}','${r.id}')">編集</button></div>`).join("")}<button class="primary" onclick="openEditor('${date}')">＋ この日に来店を追加</button></div>`;
+ list.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 function changeMonth(n){current.setMonth(current.getMonth()+n);renderCalendar();}
-function openEditor(date){
- editingDate=date;
- let old=data.records.find(r=>r.date===date);
+function openEditor(date,id=null){
+ editingDate=date;editingId=id;
+ let old=id?data.records.find(r=>r.id===id):null;
  orders=old?structuredClone(old.orders):[];
  amuse=old?structuredClone(old.amuse):[];
  chekis=old?structuredClone(old.chekis):[];
@@ -532,21 +542,21 @@ function saveRecord(){
  let discountAmount={youth:250,senior:250,child:450}[d]||0;
  let selectedRank=document.getElementById("rank").value;
  let r={date:document.getElementById("date").value,store:document.getElementById("store").value,rank:selectedRank,rankFee:Number(RANK_FEES[selectedRank]||0),discount:rate,discountType:d,discountAmount:d==="legacy"?null:discountAmount,orders,amuse,chekis,collectionChekis,memo:document.getElementById("memo").value};
- let i=data.records.findIndex(x=>x.date===r.date);
- if(i>=0)data.records[i]=r;else data.records.push(r);
+ if(editingId){let i=data.records.findIndex(x=>x.id===editingId);if(i>=0)data.records[i]={...r,id:editingId};else data.records.push({...r,id:newRecordId()});}
+ else data.records.push({...r,id:newRecordId()});
  persist();closeEditor();render();alert("来店記録を保存したよ ♡");
 }
 function deleteRecord(){
- const old=data.records.find(r=>r.date===editingDate);
+ const old=data.records.find(r=>r.id===editingId);
  if(!old)return;
- if(!confirm(`${editingDate} の来店記録を削除してもいい？\nこの操作は取り消せません。`))return;
- data.records=data.records.filter(r=>r.date!==editingDate);
+ if(!confirm(`${editingDate} の${old.store}の来店記録を削除してもいい？\nこの操作は取り消せません。`))return;
+ data.records=data.records.filter(r=>r.id!==editingId);
  persist();
  closeEditor();
  render();
  alert("来店記録を削除したよ");
 }
-function closeEditor(){document.getElementById("editor").classList.add("hidden");}
+function closeEditor(){document.getElementById("editor").classList.add("hidden");editingId=null;}
 function renderStats(){
   const records=data.records||[];
   const months={};
